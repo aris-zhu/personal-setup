@@ -68,9 +68,9 @@ Telescope needs these (all currently installed):
 
 **Aliases:**
 - `vim=nvim`
-- `vimrc=nvim ~/.config/nvim/init.lua`
-- `zshrc='nvim ~/.zshrc && source ~/.zshrc'`
-- `szsh='source ~/.zshrc'`
+- `vimrc=nvim ~/.config/nvim/init.lua` — edit the Neovim config
+- `zshrc='nvim ~/.zshrc && source ~/.zshrc'` — edit `~/.zshrc`, then auto-reload it into the current shell on quit (a shell can't reload its own parent, so the `source` runs after nvim exits)
+- `szsh='source ~/.zshrc'` — just reload `~/.zshrc` into the current shell without editing (handy after changing it elsewhere)
 - project shortcuts: `prompt`, `server`, `hyde`
 - `nb=jupyter notebook`
 - `cab='conda activate base'`

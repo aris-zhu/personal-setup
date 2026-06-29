@@ -98,3 +98,52 @@ nvim --headless "+Lazy! restore" +qa     # restores commits from lazy-lock.json
 Install a Nerd Font for the file-tree icons. `mise`, `conda`, Docker, and `postgresql@16` are referenced in `.zshrc` but are optional unless you need those toolchains.
 
 The whole nvim setup is just two files (`init.lua` + `lazy-lock.json`, ~7KB total) — copy them plus `ripgrep`/`fd` and you've reproduced the editor exactly.
+
+## Window tiling (Linux / GNOME) — Rectangle-style shortcuts
+
+On the Linux box (Ubuntu, **GNOME Shell on Wayland**), window snapping is set up to feel like macOS **Rectangle**, driven by the pre-installed **Tiling Assistant** extension (`tiling-assistant@ubuntu.com`).
+
+**Modifier choice:** the trigger is `Ctrl + Super`. On a Logitech multi-OS keyboard, `Super` is the key labelled **`start / ⌘`** (the Command key in Mac mode). The key labelled `alt / opt` is plain **Alt** on Linux — Linux has no separate "Option" modifier. `Ctrl+Alt+Arrow` was avoided because it collides with GNOME's default workspace switching.
+
+| Action | Shortcut |
+|---|---|
+| Left / Right / Top / Bottom half | `Ctrl + Super + ← / → / ↑ / ↓` |
+| Thirds (½ → ⅔ → ⅓) | press the same arrow repeatedly |
+| Maximize | `Ctrl + Super + Return` |
+| Quarters (TL / TR / BL / BR) | `Ctrl + Super + U / I / J / K` |
+| Restore / un-tile | `Ctrl + Super + Backspace` |
+
+The "tiling popup" (snap-assist that asks you to fill the other half with another app) is **disabled**, so snapping one half leaves the rest of the screen untouched. Workspace switching was moved off the arrow keys onto `Super + Alt + Arrows` (plus the stock `Super + PageUp/PageDown`) to free up the tiling chords.
+
+### Replication (fresh GNOME / Ubuntu)
+
+Tiling Assistant ships with Ubuntu; ensure it's enabled, then apply the gsettings:
+
+```bash
+gnome-extensions enable tiling-assistant@ubuntu.com
+
+TA=org.gnome.shell.extensions.tiling-assistant
+gsettings set $TA tile-left-half           "['<Control><Super>Left']"
+gsettings set $TA tile-right-half          "['<Control><Super>Right']"
+gsettings set $TA tile-top-half            "['<Control><Super>Up']"
+gsettings set $TA tile-bottom-half         "['<Control><Super>Down']"
+gsettings set $TA tile-maximize            "['<Control><Super>Return']"
+gsettings set $TA tile-topleft-quarter     "['<Control><Super>u']"
+gsettings set $TA tile-topright-quarter    "['<Control><Super>i']"
+gsettings set $TA tile-bottomleft-quarter  "['<Control><Super>j']"
+gsettings set $TA tile-bottomright-quarter "['<Control><Super>k']"
+gsettings set $TA restore-window           "['<Control><Super>BackSpace']"
+gsettings set $TA enable-tiling-popup false   # no "fill the other half" prompt
+
+# Move workspace switching off Ctrl+Alt+Arrows so the tiling chords are free
+WM=org.gnome.desktop.wm.keybindings
+gsettings set $WM switch-to-workspace-left  "['<Super>Page_Up', '<Super>KP_Prior', '<Super><Alt>Left']"
+gsettings set $WM switch-to-workspace-right "['<Super>Page_Down', '<Super>KP_Next', '<Super><Alt>Right']"
+gsettings set $WM switch-to-workspace-up    "['<Super><Alt>Up']"
+gsettings set $WM switch-to-workspace-down  "['<Super><Alt>Down']"
+
+# Force the extension to re-grab the keys
+gnome-extensions disable tiling-assistant@ubuntu.com && gnome-extensions enable tiling-assistant@ubuntu.com
+```
+
+To restore the snap-assist popup later: `gsettings set org.gnome.shell.extensions.tiling-assistant enable-tiling-popup true`.

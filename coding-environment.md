@@ -66,6 +66,8 @@ Telescope needs these (all currently installed):
 - oh-my-zsh, `ZSH_THEME="gallifrey"`, no `plugins=(...)` array (stock omz only)
 - `.zshenv` just sources `~/.cargo/env`
 
+**Git branch in prompt:** the `gallifrey` theme shows the current branch on the right-hand side of the prompt (rendered asynchronously, so it appears a beat after the prompt draws). `.zshrc` also contains a self-contained `vcs_info` fallback that draws `(branch)` inline — it's guarded by `if ! typeset -f git_prompt_info` so it **only activates when oh-my-zsh isn't loaded**; once omz/gallifrey is present, the theme drives the branch and the fallback disables itself.
+
 **Aliases:**
 - `vim=nvim`
 - `vimrc=nvim ~/.config/nvim/init.lua` — edit the Neovim config
@@ -80,14 +82,19 @@ Telescope needs these (all currently installed):
 ## Replication steps (fresh macOS)
 
 ```bash
-# 1. Core tools
+# 1. Core tools  (macOS: brew | Ubuntu/Debian: sudo apt install neovim ripgrep fd-find git zsh)
 brew install neovim ripgrep fd git
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+
+# 1b. oh-my-zsh — install WITHOUT overwriting the hand-maintained ~/.zshrc.
+#     --keep-zshrc preserves it; --unattended skips the chsh prompt.
+RUNZSH=no KEEP_ZSHRC=yes sh -c \
+  "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" \
+  "" --unattended --keep-zshrc
 
 # 2. Drop in configs (copy these files from this machine)
 #   ~/.config/nvim/init.lua
 #   ~/.config/nvim/lazy-lock.json   <- keeps exact plugin versions
-#   ~/.zshrc   (set ZSH_THEME="gallifrey")
+#   ~/.zshrc   (ZSH_THEME="gallifrey"; already sources omz + the vcs_info branch fallback)
 #   ~/.zshenv
 
 # 3. First nvim launch bootstraps lazy.nvim and installs all plugins.

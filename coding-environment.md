@@ -75,6 +75,7 @@ Telescope needs these (all currently installed):
 - `szsh='source ~/.zshrc'` — just reload `~/.zshrc` into the current shell without editing (handy after changing it elsewhere)
 - `nb=jupyter notebook`
 - `cab='conda activate base'`
+- `keepawake='~/.local/bin/keepawake'` — toggle display-sleep prevention (see [Keeping the Mac awake](#keeping-the-mac-awake--keepawake))
 
 **PATH/env:** homebrew python/ruby, `~/.local/bin`, `~/.cargo/bin`, conda init block, `eval "$(~/.local/bin/mise activate)"`, `OPENSSL_ROOT_DIR`, Docker bin, `postgresql@16` bin.
 
@@ -153,6 +154,40 @@ killall SystemUIServer
 **Log out and back in** for the new hotkey to take effect — `activateSettings -u` reloads most prefs, but the symbolic-hotkey table is only re-read by the WindowServer at login.
 
 To revert: set hotkey 28's `parameters` back to `[51, 20, 1179648]` (`⌘⇧3`), or just re-enable it in *System Settings → Keyboard → Keyboard Shortcuts → Screenshots*.
+
+## Keeping the Mac awake — `keepawake`
+
+`scripts/keepawake` (lives at `~/.local/bin/keepawake` on the machine) keeps the display from sleeping during long unattended runs — training jobs, downloads, remote sessions. It's a thin wrapper over macOS's built-in **`caffeinate`**, so there's no app to install and nothing running in the menu bar.
+
+| Command | Effect |
+|---|---|
+| `keepawake` | toggle on/off |
+| `keepawake on` | start it (`caffeinate -d`, backgrounded via `nohup`) |
+| `keepawake off` | stop it, restore normal sleep |
+| `keepawake status` | report both the caffeinate state and lid mode |
+| `keepawake lid` | *also* keep running with the lid **closed** (`sudo pmset -a disablesleep 1`) |
+| `keepawake lid-off` | restore normal lid-close sleep |
+
+**Two independent levels, and the difference matters.** The default (`on`) uses `caffeinate -d`, which blocks only *idle* display sleep — pressing the power button, choosing Apple menu → Sleep, or closing the lid still sleeps the Mac immediately, exactly as normal. It's safe to leave on and it dies with a reboot.
+
+`lid` is the sharper tool: `pmset -a disablesleep 1` disables sleep **entirely**, including the Apple-menu and lid-close paths, and it **persists across reboots**. That's the one to be careful with — a Mac in a bag with the lid shut and lid mode on will stay running and cook. `keepawake off` deliberately does *not* clear it (they're separate mechanisms); instead it prints a reminder if lid mode is still active, and `status` always shows both. Run `keepawake lid-off` when you're done.
+
+State is tracked with a pidfile at `${TMPDIR:-/tmp}/keepawake.pid`, so `status`/`toggle` survive across shells but reset on reboot — which is the intent, since the underlying `caffeinate` process doesn't survive either.
+
+### Replication (fresh macOS)
+
+Nothing to install — `caffeinate` and `pmset` are stock macOS. Just drop the script in and alias it:
+
+```bash
+mkdir -p ~/.local/bin
+cp scripts/keepawake ~/.local/bin/keepawake
+chmod +x ~/.local/bin/keepawake
+
+# ~/.local/bin is already on PATH via .zshrc; the alias is there for discoverability
+echo "alias keepawake='~/.local/bin/keepawake'" >> ~/.zshrc && source ~/.zshrc
+```
+
+`keepawake lid` prompts for `sudo` (it's the only subcommand that needs it).
 
 ## Window tiling (Linux / GNOME) — Rectangle-style shortcuts
 

@@ -1,0 +1,106 @@
+#!/bin/bash
+# keepawake — keep the display on while idle, using macOS's built-in caffeinate.
+#
+# Uses `caffeinate -d`, which only blocks *idle* display sleep. Pressing the
+# power button, choosing Apple menu > Sleep, or closing the lid still puts
+# the Mac to sleep immediately, exactly as normal.
+#
+# Usage:
+#   keepawake            toggle on/off
+#   keepawake on         turn on
+#   keepawake off        turn off
+#   keepawake status     show current state
+#   keepawake lid        keep running even with the lid closed (sudo pmset disablesleep)
+#   keepawake lid-off    restore normal lid-close sleep
+#
+# `lid` disables sleep entirely (even Apple menu > Sleep) and survives
+# reboots — remember to run `keepawake lid-off` when done, and never close
+# the Mac in a bag while it's on.
+
+PIDFILE="${TMPDIR:-/tmp}/keepawake.pid"
+
+is_running() {
+  [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null
+}
+
+lid_sleep_disabled() {
+  pmset -g | grep -Eq 'SleepDisabled[[:space:]]+1'
+}
+
+turn_on() {
+  if is_running; then
+    echo "keepawake is already on (pid $(cat "$PIDFILE"))"
+    return
+  fi
+  nohup caffeinate -d >/dev/null 2>&1 &
+  echo $! > "$PIDFILE"
+  echo "keepawake ON — the screen will stay on until you turn this off or sleep the Mac yourself"
+}
+
+turn_off() {
+  if is_running; then
+    kill "$(cat "$PIDFILE")"
+    rm -f "$PIDFILE"
+    echo "keepawake OFF — normal sleep settings restored"
+  else
+    rm -f "$PIDFILE"
+    echo "keepawake was not running"
+  fi
+  if lid_sleep_disabled; then
+    echo "note: lid-close sleep is still disabled — run 'keepawake lid-off' to restore it"
+  fi
+}
+
+lid_on() {
+  if lid_sleep_disabled; then
+    echo "lid-close sleep is already disabled"
+    return
+  fi
+  if sudo pmset -a disablesleep 1; then
+    echo "lid mode ON — the Mac will keep running with the lid closed"
+    echo "warning: sleep is disabled entirely (even Apple menu > Sleep) until 'keepawake lid-off'."
+    echo "         Do not put the Mac in a bag with the lid closed while this is on."
+  else
+    echo "failed to disable lid-close sleep" >&2
+    return 1
+  fi
+}
+
+lid_off() {
+  if ! lid_sleep_disabled; then
+    echo "lid-close sleep is already enabled (normal behavior)"
+    return
+  fi
+  if sudo pmset -a disablesleep 0; then
+    echo "lid mode OFF — closing the lid puts the Mac to sleep as normal"
+  else
+    echo "failed to re-enable lid-close sleep" >&2
+    return 1
+  fi
+}
+
+case "${1:-toggle}" in
+  on|start)   turn_on ;;
+  off|stop)   turn_off ;;
+  lid|lid-on) lid_on ;;
+  lid-off)    lid_off ;;
+  status)
+    if is_running; then
+      echo "keepawake is ON (pid $(cat "$PIDFILE"))"
+    else
+      echo "keepawake is OFF"
+    fi
+    if lid_sleep_disabled; then
+      echo "lid mode is ON — the Mac keeps running with the lid closed ('keepawake lid-off' to restore)"
+    else
+      echo "lid mode is OFF — closing the lid sleeps the Mac as normal"
+    fi
+    ;;
+  toggle)
+    if is_running; then turn_off; else turn_on; fi
+    ;;
+  *)
+    echo "usage: keepawake [on|off|lid|lid-off|status]" >&2
+    exit 1
+    ;;
+esac

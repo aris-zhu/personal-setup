@@ -68,6 +68,28 @@ Telescope needs these (all currently installed):
 
 **Git branch in prompt:** the `gallifrey` theme shows the current branch on the right-hand side of the prompt (rendered asynchronously, so it appears a beat after the prompt draws). `.zshrc` also contains a self-contained `vcs_info` fallback that draws `(branch)` inline — it's guarded by `if ! typeset -f git_prompt_info` so it **only activates when oh-my-zsh isn't loaded**; once omz/gallifrey is present, the theme drives the branch and the fallback disables itself.
 
+**Prompt label is `AZ`.** The prompt reads `AZ ~ »`. `.zshrc` re-defines `PROMPT` *after* sourcing omz, substituting a short fixed label for the one gallifrey opens with and keeping the rest of the theme's prompt verbatim (`%2~` dir, git slot, bold `»`, red-when-root):
+
+```zsh
+if typeset -f git_prompt_info > /dev/null; then
+    PROMPT="%(!.%{$fg[red]%}.%{$fg[green]%})AZ%{$reset_color%} %2~ \$(git_prompt_info)%{$reset_color%}%B»%b "
+fi
+```
+
+The `typeset -f` guard means it only applies when omz actually loaded. This is a prompt-only change — no system settings are touched.
+
+**No `(base)` prefix — conda does not auto-activate.** A stock Anaconda install activates its `base` env in every new shell, so the prompt reads `(base) AZ ~ »`. That's turned off in `~/.condarc`:
+
+```yaml
+auto_activate: false
+```
+
+(The key was called `auto_activate_base` before conda 25.x; on current conda it's `auto_activate`.) Conda stays on `PATH` and works normally — you just aren't *in* an env until you ask, via the `cab` alias. `(base)` reappearing is then a real signal that base is active rather than constant noise.
+
+Two consequences worth knowing:
+- **Bare `python` is Homebrew's, not Anaconda's,** in a fresh shell. Run `cab` first if you want Anaconda's interpreter.
+- `conda deactivate` takes **no argument** — `conda deactivate base` is an error (`ArgumentError: deactivate does not accept arguments`). It's also only per-shell; the `.condarc` setting above is the durable fix.
+
 **Aliases:**
 - `vim=nvim`
 - `vimrc=nvim ~/.config/nvim/init.lua` — edit the Neovim config
@@ -94,12 +116,17 @@ RUNZSH=no KEEP_ZSHRC=yes sh -c \
 # 2. Drop in configs (copy these files from this machine)
 #   ~/.config/nvim/init.lua
 #   ~/.config/nvim/lazy-lock.json   <- keeps exact plugin versions
-#   ~/.zshrc   (ZSH_THEME="gallifrey"; already sources omz + the vcs_info branch fallback)
+#   ~/.zshrc   (ZSH_THEME="gallifrey"; already sources omz + the vcs_info branch
+#               fallback + the AZ prompt override)
 #   ~/.zshenv
 
 # 3. First nvim launch bootstraps lazy.nvim and installs all plugins.
 #    To get byte-identical plugin versions:
 nvim --headless "+Lazy! restore" +qa     # restores commits from lazy-lock.json
+
+# 4. If Anaconda is installed: stop it auto-activating base in every shell,
+#    which is what puts the "(base)" prefix on the prompt.
+conda config --set auto_activate false   # pre-25.x conda: auto_activate_base
 ```
 
 Install a Nerd Font for the file-tree icons. `mise`, `conda`, Docker, and `postgresql@16` are referenced in `.zshrc` but are optional unless you need those toolchains.

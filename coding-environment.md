@@ -73,7 +73,6 @@ Telescope needs these (all currently installed):
 - `vimrc=nvim ~/.config/nvim/init.lua` — edit the Neovim config
 - `zshrc='nvim ~/.zshrc && source ~/.zshrc'` — edit `~/.zshrc`, then auto-reload it into the current shell on quit (a shell can't reload its own parent, so the `source` runs after nvim exits)
 - `szsh='source ~/.zshrc'` — just reload `~/.zshrc` into the current shell without editing (handy after changing it elsewhere)
-- project shortcuts: `prompt`, `server`, `hyde`
 - `nb=jupyter notebook`
 - `cab='conda activate base'`
 
@@ -105,6 +104,55 @@ nvim --headless "+Lazy! restore" +qa     # restores commits from lazy-lock.json
 Install a Nerd Font for the file-tree icons. `mise`, `conda`, Docker, and `postgresql@16` are referenced in `.zshrc` but are optional unless you need those toolchains.
 
 The whole nvim setup is just two files (`init.lua` + `lazy-lock.json`, ~7KB total) — copy them plus `ripgrep`/`fd` and you've reproduced the editor exactly.
+
+## Screenshots (macOS) — `F4`
+
+On the Mac, **bare `F4`** captures the full screen straight to a file in `~/screenshots`. This overrides F4's stock behaviour (Spotlight/Launchpad).
+
+It's built entirely from macOS's own hotkey table — no Hammerspoon/skhd, no extra app:
+
+| Setting | Value | Why |
+|---|---|---|
+| `com.apple.screencapture` `location` | `~/screenshots` | where captures land (default is the Desktop) |
+| `com.apple.symbolichotkeys` id **28** | `F4`, no modifiers | id 28 is *"Save picture of screen as a file"* (stock `⌘⇧3`) |
+| `NSGlobalDomain com.apple.keyboard.fnState` | `true` | **required** — see below |
+
+**Why `fnState` matters:** by default the top row sends *media keys*, so pressing F4 emits "Spotlight", not the F4 keycode — and a hotkey bound to F4 would never fire. Setting `fnState = true` makes the row behave as real function keys. The trade-off is global: brightness, volume, etc. now need `fn` held. (Leave `fnState` alone if you'd rather press `fn+F4`.)
+
+The hotkey's `parameters` array is `[asciiCode, keyCode, modifierFlags]` — `65535` means "no ASCII character" (correct for function keys), `118` is F4's virtual keycode, `0` is no modifiers.
+
+### Replication (fresh macOS)
+
+```bash
+mkdir -p ~/screenshots
+defaults write com.apple.screencapture location "$HOME/screenshots"
+defaults write com.apple.screencapture type png
+
+# Make the top row send real F-keys, so bare F4 is even deliverable
+defaults write NSGlobalDomain com.apple.keyboard.fnState -bool true
+
+# Rebind "Save picture of screen as a file" (hotkey 28) to bare F4
+defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 28 '
+<dict>
+  <key>enabled</key><true/>
+  <key>value</key><dict>
+    <key>parameters</key>
+    <array>
+      <integer>65535</integer>
+      <integer>118</integer>
+      <integer>0</integer>
+    </array>
+    <key>type</key><string>standard</string>
+  </dict>
+</dict>'
+
+killall SystemUIServer
+/System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u
+```
+
+**Log out and back in** for the new hotkey to take effect — `activateSettings -u` reloads most prefs, but the symbolic-hotkey table is only re-read by the WindowServer at login.
+
+To revert: set hotkey 28's `parameters` back to `[51, 20, 1179648]` (`⌘⇧3`), or just re-enable it in *System Settings → Keyboard → Keyboard Shortcuts → Screenshots*.
 
 ## Window tiling (Linux / GNOME) — Rectangle-style shortcuts
 

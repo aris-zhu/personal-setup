@@ -133,9 +133,9 @@ Install a Nerd Font for the file-tree icons. `mise`, `conda`, Docker, and `postg
 
 The whole nvim setup is just two files (`init.lua` + `lazy-lock.json`, ~7KB total) — copy them plus `ripgrep`/`fd` and you've reproduced the editor exactly.
 
-## Screenshots (macOS) — `F4`
+## Screenshots (macOS) — `fn+F4`
 
-On the Mac, **bare `F4`** captures the full screen straight to a file in `~/screenshots`. This overrides F4's stock behaviour (Spotlight/Launchpad).
+On the Mac, **`fn+F4`** captures the full screen straight to a file in `~/screenshots`. This overrides F4's stock behaviour (Spotlight/Launchpad).
 
 It's built entirely from macOS's own hotkey table — no Hammerspoon/skhd, no extra app:
 
@@ -143,9 +143,11 @@ It's built entirely from macOS's own hotkey table — no Hammerspoon/skhd, no ex
 |---|---|---|
 | `com.apple.screencapture` `location` | `~/screenshots` | where captures land (default is the Desktop) |
 | `com.apple.symbolichotkeys` id **28** | `F4`, no modifiers | id 28 is *"Save picture of screen as a file"* (stock `⌘⇧3`) |
-| `NSGlobalDomain com.apple.keyboard.fnState` | `true` | **required** — see below |
+| `NSGlobalDomain com.apple.keyboard.fnState` | `false` | keeps the top row as media keys — see below |
 
-**Why `fnState` matters:** by default the top row sends *media keys*, so pressing F4 emits "Spotlight", not the F4 keycode — and a hotkey bound to F4 would never fire. Setting `fnState = true` makes the row behave as real function keys. The trade-off is global: brightness, volume, etc. now need `fn` held. (Leave `fnState` alone if you'd rather press `fn+F4`.)
+**Why `fnState` matters, and why it's `false` here.** The top row is either media keys or real F-keys, never both. With `fnState = false` (the default, and the setting used here) the row sends **media keys**, so brightness and volume are one bare press — and `fn` is what produces the real F4 keycode. So the screenshot hotkey, bound to F4 with no modifiers, fires on **`fn+F4`**. macOS doesn't treat `fn` as a modifier when matching the hotkey, so no modifier flags are needed in the binding.
+
+Setting `fnState = true` would invert this: bare `F4` would take the screenshot, but brightness/volume would then need `fn` held — globally, for every app. That trade wasn't worth it; media keys get pressed far more often than the screenshot key. If you'd rather have bare `F4`, flip the value and the hotkey binding below still works unchanged.
 
 The hotkey's `parameters` array is `[asciiCode, keyCode, modifierFlags]` — `65535` means "no ASCII character" (correct for function keys), `118` is F4's virtual keycode, `0` is no modifiers.
 
@@ -156,10 +158,11 @@ mkdir -p ~/screenshots
 defaults write com.apple.screencapture location "$HOME/screenshots"
 defaults write com.apple.screencapture type png
 
-# Make the top row send real F-keys, so bare F4 is even deliverable
-defaults write NSGlobalDomain com.apple.keyboard.fnState -bool true
+# Keep the top row as media keys (brightness/volume on a bare press).
+# `fn` then yields the real F4 keycode, so the hotkey below fires on fn+F4.
+defaults write NSGlobalDomain com.apple.keyboard.fnState -bool false
 
-# Rebind "Save picture of screen as a file" (hotkey 28) to bare F4
+# Rebind "Save picture of screen as a file" (hotkey 28) to F4
 defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 28 '
 <dict>
   <key>enabled</key><true/>
@@ -179,6 +182,8 @@ killall SystemUIServer
 ```
 
 **Log out and back in** for the new hotkey to take effect — `activateSettings -u` reloads most prefs, but the symbolic-hotkey table is only re-read by the WindowServer at login.
+
+The same applies to `fnState`: the WindowServer caches it at login, so the live top-row behaviour can disagree with what `defaults read` reports until you log out. If the keyboard is behaving the opposite of the stored value, that drift is why — log out, or toggle it once in *System Settings → Keyboard → Keyboard Shortcuts → Function Keys*, which writes through the path the WindowServer actually listens to.
 
 To revert: set hotkey 28's `parameters` back to `[51, 20, 1179648]` (`⌘⇧3`), or just re-enable it in *System Settings → Keyboard → Keyboard Shortcuts → Screenshots*.
 

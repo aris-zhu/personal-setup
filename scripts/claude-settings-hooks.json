@@ -1,0 +1,58 @@
+{
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "afplay /System/Library/Sounds/Submarine.aiff",
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/tab-color.sh flash",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "afplay /System/Library/Sounds/Blow.aiff",
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/tab-color.sh done",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/tab-color.sh clear",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/tab-color.sh clear",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}

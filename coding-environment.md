@@ -264,3 +264,54 @@ gnome-extensions disable tiling-assistant@ubuntu.com && gnome-extensions enable 
 ```
 
 To restore the snap-assist popup later: `gsettings set org.gnome.shell.extensions.tiling-assistant enable-tiling-popup true`.
+
+## Claude Code notifications — sound + tab colour
+
+Claude Code runs long turns, so it's easy to wander off and miss the moment it needs an answer. Two ambient cues fix that, both driven by **hooks** in `~/.claude/settings.json` (hooks are the only mechanism here — Claude executes nothing automatic from memory or preferences; the harness runs these commands on lifecycle events).
+
+| Event | Meaning | Sound | Tab |
+|---|---|---|---|
+| `Notification` | Claude wants input — a permission prompt or a question | `Submarine` (low sonar bloop) | slow **light-pink fade**, in and out |
+| `Stop` | Claude finished its turn | `Blow` (soft breathy chime) | solid **matcha green** |
+| `UserPromptSubmit` | you sent a prompt; work is underway | — | reset to default |
+| `SessionEnd` | session over | — | reset to default |
+
+Sounds are stock macOS (`/System/Library/Sounds/*.aiff`, played with `afplay` — no dependency). The other 12 to choose from: Basso, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Tink.
+
+All four hooks are marked `"async": true` so they never add latency to a turn.
+
+### The tab colour script — `scripts/claude-tab-color.sh`
+
+Lives at `~/.claude/tab-color.sh` on the machine. Takes one argument: `flash`, `done`, or `clear`.
+
+**iTerm2 only.** Tab colour is set with a proprietary iTerm2 escape sequence (`OSC 6 ; 1 ; bg ; <channel> ; brightness ; <0-255>`), reset with `OSC 6 ; 1 ; bg ; * ; default`. Terminal.app has no equivalent.
+
+Two implementation details that are easy to get wrong:
+
+- **Hook stdout never reaches the terminal.** Claude Code captures it, so a `printf '\033]6;...'` to stdout does nothing. The script walks up the process tree (`ps -o ppid=`) until it finds an ancestor with a real controlling tty, then writes the escape sequence straight to that device (e.g. `/dev/ttys006`).
+- **The fade is a background loop, so it needs a kill switch.** `flash` forks a pulse loop and records its PID in `/tmp/claude-tabcolor-<tty>.pid`; every mode calls `stop_flasher` first, so `done`/`clear` reliably terminate a pulse in progress. The loop also self-terminates after 30 minutes and on `TERM`/`INT` (restoring the default colour), so a stray flasher can't outlive its session.
+
+The pulse eases between a dim base and full pink with a **smoothstep** curve (`3x² − 2x³`, integer maths in permille) rather than a linear ramp — it lingers at the extremes and reads as a breath rather than a blink. Tune `STEPS` and `FRAME` at the top of the script for speed, `PINK_*` / `MATCHA_*` for colour.
+
+### Replication (fresh macOS + iTerm2)
+
+```bash
+# 1. The tab-colour script
+cp scripts/claude-tab-color.sh ~/.claude/tab-color.sh
+chmod +x ~/.claude/tab-color.sh
+
+# 2. Merge scripts/claude-settings-hooks.json into ~/.claude/settings.json.
+#    NOTE: jq's `*` replaces same-named arrays wholesale — it does NOT append.
+#    Safe only if you have no Notification/Stop/UserPromptSubmit/SessionEnd hooks
+#    already; otherwise hand-merge, or you'll silently drop the existing ones.
+jq -s '.[0] * .[1]' ~/.claude/settings.json scripts/claude-settings-hooks.json \
+  > /tmp/cc.json && mv /tmp/cc.json ~/.claude/settings.json
+
+# 3. Sanity-check the wiring, then preview the cues
+jq -e '.hooks | keys' ~/.claude/settings.json
+~/.claude/tab-color.sh flash   # tab breathes pink
+~/.claude/tab-color.sh done    # tab goes matcha green
+~/.claude/tab-color.sh clear   # tab resets
+```
+
+Claude Code only watches directories that already had a settings file when the session started, so **new hooks don't fire until the config reloads** — open `/hooks` once, or restart Claude Code.

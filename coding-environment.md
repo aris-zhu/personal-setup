@@ -6,7 +6,7 @@ A replicable description of the current Neovim + zsh setup, including plugins, k
 
 | Layer | Tool | Notes |
 |---|---|---|
-| Editor | **Neovim 0.12.3** (LuaJIT 2.1) | config at `~/.config/nvim/` |
+| Editor | **Neovim 0.12.4** (LuaJIT 2.1) | config at `~/.config/nvim/` |
 | Plugin manager | **lazy.nvim** (self-bootstrapping) | lockfile pins exact commits |
 | Shell | **zsh** + **oh-my-zsh**, theme `gallifrey` | no extra omz plugins enabled |
 | Version mgr | **mise** + **conda** (anaconda3) | both auto-activated in `.zshrc` |
@@ -39,14 +39,61 @@ A single self-contained `init.lua` (a "superset of the old `.vimrc`"). Structure
 | insert | `<Tab>` / `<S-Tab>` | cycle completion menu (supertab-style) |
 | insert | `<CR>` | confirm completion |
 
+**LSP keymaps** — buffer-local, active only once a language server attaches (so `gd` keeps its
+built-in "local declaration" meaning in files with no LSP). Code navigation goes through Telescope
+pickers: a single result jumps straight there, multiple results open a fuzzy-searchable list.
+
+| Mode | Key | Action |
+|---|---|---|
+| normal | `gd` | go to definition |
+| normal | `gr` | list references ("everywhere this is used") |
+| normal | `gy` | go to type definition |
+| normal | `<leader>gi` | list implementations |
+| normal | `<leader>rn` | rename symbol (project-wide) |
+| normal | `<leader>ca` | code action |
+| normal | `K` | hover docs (Neovim built-in default) |
+| normal | `[d` / `]d` | previous / next diagnostic (built-in default) |
+
+#### Why the built-in `gr*` maps are deleted
+
+Neovim 0.11+ ships its own LSP defaults on a **`gr` prefix**: `grn` (rename), `gra` (code action),
+`grr` (references), `gri` (implementation), `grt` (type def), `grx`. Leaving those mapped makes a
+bare `gr` ambiguous — Neovim can't know whether you're done typing or about to add another `r`, so
+it sits and waits out `timeoutlen` (~1s) before firing.
+
+`init.lua` therefore deletes all six defaults (in a `pcall` loop, since older versions don't define
+them) so `gr` fires instantly, and re-homes the two genuinely useful ones on `<leader>rn` /
+`<leader>ca`. If a future `gr`-prefixed default is added upstream and `gr` starts feeling laggy
+again, add it to that delete list.
+
 ### Plugins
 
-5 user plugins + dependencies, all commit-pinned in `lazy-lock.json`:
+6 user plugins + dependencies, all commit-pinned in `lazy-lock.json`:
 
 - `telescope.nvim` (branch `0.1.x`) + `plenary.nvim` — fuzzy find & grep
 - `nvim-tree.lua` + `nvim-web-devicons` — file tree, 35-col width, `group_empty=true`
 - `Comment.nvim` — `gcc`/`gc` commenting
-- `nvim-cmp` + `cmp-buffer`, `cmp-path`, `LuaSnip`, `cmp_luasnip` — completion
+- `nvim-cmp` + `cmp-nvim-lsp`, `cmp-buffer`, `cmp-path`, `LuaSnip`, `cmp_luasnip` — completion
+- `nvim-lspconfig` — LSP client configs; supplies the server `cmd` / `filetypes` / root-marker
+  detection that `gd`/`gr` rely on
+
+### LSP
+
+Servers are enabled via `vim.lsp.enable({ "ts_ls", "lua_ls" })` (Neovim 0.11+ API — `nvim-lspconfig`
+ships the definitions, Neovim starts them). `cmp-nvim-lsp` advertises nvim-cmp's completion
+capabilities to every server via `vim.lsp.config("*", ...)`, which is what routes LSP completions
+into the existing `<Tab>` menu.
+
+| Server | Language | Root markers |
+|---|---|---|
+| `ts_ls` | TypeScript / JS / TSX | `tsconfig.json`, `package.json`, `.git` |
+| `lua_ls` | Lua (the nvim config itself) | `.luarc.json`, `.git` |
+
+`lua_ls` is configured for `LuaJIT`, told `vim` is a global (it's injected by the editor, not
+declared), and pointed at the Neovim runtime so `gd` works on Neovim's own API functions.
+
+Two servers, because that's what this machine actually writes: TypeScript projects and this
+`init.lua`. Adding another is one entry in `vim.lsp.enable` plus installing its binary.
 
 ### Custom autocmd
 
@@ -60,6 +107,21 @@ Telescope needs these (all currently installed):
 - `fd` 10.4.2 (find_files)
 - `git` (used by lazy.nvim to clone plugins)
 - A **Nerd Font** in the terminal for nvim-web-devicons icons to render
+
+The language servers are plain binaries on `PATH` — Neovim spawns them, nothing auto-installs them:
+
+- `typescript-language-server` 5.3.0 (npm, global) — powers `gd`/`gr` in TS/JS
+- `typescript` 5.9.3 (npm, global) — see the pin note below
+- `lua-language-server` 3.18.2 (brew)
+
+> **Pin global `typescript` to 5.x — not `latest`.**
+> `typescript-language-server` doesn't bundle TypeScript; it locates one, preferring the workspace's
+> `node_modules/typescript` and falling back to the global install for files in projects that have
+> none. As of TypeScript **7.x** (the native rewrite) the package no longer ships `lib/tsserver.js`,
+> which is exactly what the language server looks for. A bare `npm i -g typescript` installs 7.x and
+> `ts_ls` then dies on startup with *"Could not find a valid TypeScript installation"* — in projects
+> without local TypeScript only, which makes it look intermittent. Hence `typescript@5.9.3`.
+> Projects with their own TypeScript are unaffected either way, since the workspace copy wins.
 
 ## Shell — `~/.zshrc`
 
@@ -107,6 +169,12 @@ Two consequences worth knowing:
 # 1. Core tools  (macOS: brew | Ubuntu/Debian: sudo apt install neovim ripgrep fd-find git zsh)
 brew install neovim ripgrep fd git
 
+# 1a. Language servers for gd / gr (see the "Pin global typescript to 5.x" note above —
+#     `typescript@5`, NOT bare `typescript`, which now resolves to the 7.x native rewrite
+#     that ts_ls can't drive).
+brew install lua-language-server
+npm install -g typescript-language-server typescript@5
+
 # 1b. oh-my-zsh — install WITHOUT overwriting the hand-maintained ~/.zshrc.
 #     --keep-zshrc preserves it; --unattended skips the chsh prompt.
 RUNZSH=no KEEP_ZSHRC=yes sh -c \
@@ -127,11 +195,16 @@ nvim --headless "+Lazy! restore" +qa     # restores commits from lazy-lock.json
 # 4. If Anaconda is installed: stop it auto-activating base in every shell,
 #    which is what puts the "(base)" prefix on the prompt.
 conda config --set auto_activate false   # pre-25.x conda: auto_activate_base
+
+# 5. Sanity-check the LSP wiring: open a .ts file inside a real project and run
+#    :checkhealth vim.lsp   -> ts_ls should be listed as attached.
+#    If it isn't, :LspLog is the first place to look (the TypeScript 7.x trap above
+#    surfaces there as "Could not find a valid TypeScript installation").
 ```
 
 Install a Nerd Font for the file-tree icons. `mise`, `conda`, Docker, and `postgresql@16` are referenced in `.zshrc` but are optional unless you need those toolchains.
 
-The whole nvim setup is just two files (`init.lua` + `lazy-lock.json`, ~7KB total) — copy them plus `ripgrep`/`fd` and you've reproduced the editor exactly.
+The whole nvim setup is still just two files (`init.lua` + `lazy-lock.json`, ~9KB total) — copy them plus `ripgrep`/`fd` and the language-server binaries from step 1a, and you've reproduced the editor exactly.
 
 ## Screenshots (macOS) — `fn+F4`
 

@@ -349,7 +349,7 @@ Claude Code runs long turns, so it's easy to wander off and miss the moment it n
 
 | Event | Meaning | Sound | Tab |
 |---|---|---|---|
-| `Notification` | Claude wants input — a permission prompt or a question | `Submarine` (low sonar bloop) | slow **light-pink fade**, in and out |
+| `Notification` | Claude wants input — a permission prompt or a question | `Submarine` (low sonar bloop) | solid **light pink** |
 | `Stop` | Claude finished its turn | `Blow` (soft breathy chime) | solid **matcha green** |
 | `UserPromptSubmit` | you sent a prompt; work is underway | — | reset to default |
 | `SessionEnd` | session over | — | reset to default |
@@ -367,9 +367,9 @@ Lives at `~/.claude/tab-color.sh` on the machine. Takes one argument: `flash`, `
 Two implementation details that are easy to get wrong:
 
 - **Hook stdout never reaches the terminal.** Claude Code captures it, so a `printf '\033]6;...'` to stdout does nothing. The script walks up the process tree (`ps -o ppid=`) until it finds an ancestor with a real controlling tty, then writes the escape sequence straight to that device (e.g. `/dev/ttys006`).
-- **The fade is a background loop, so it needs a kill switch.** `flash` forks a pulse loop and records its PID in `/tmp/claude-tabcolor-<tty>.pid`; every mode calls `stop_flasher` first, so `done`/`clear` reliably terminate a pulse in progress. The loop also self-terminates after 30 minutes and on `TERM`/`INT` (restoring the default colour), so a stray flasher can't outlive its session.
+- **Don't animate the tab colour.** An earlier version of this script pulsed pink with a smoothstep fade, forked as a background loop. iTerm2 treats every OSC 6 sequence as a session-profile mutation, so even a modest frame rate pegs its main thread. The colours are now set statically, once per event. `stop_flasher` survives only to kill a stray loop left over from that version — it reads `/tmp/claude-tabcolor-<tty>.pid` and can be dropped once no old sessions remain.
 
-The pulse eases between a dim base and full pink with a **smoothstep** curve (`3x² − 2x³`, integer maths in permille) rather than a linear ramp — it lingers at the extremes and reads as a breath rather than a blink. Tune `STEPS` and `FRAME` at the top of the script for speed, `PINK_*` / `MATCHA_*` for colour.
+Pink now means one thing: **Claude is blocked on you.** It's set from the `Notification` hook only, which fires on permission prompts and questions — not on ordinary turn completion, which gets matcha green instead. Tune `PINK_*` / `MATCHA_*` at the top of the script for colour.
 
 ### Replication (fresh macOS + iTerm2)
 
@@ -387,7 +387,7 @@ jq -s '.[0] * .[1]' ~/.claude/settings.json scripts/claude-settings-hooks.json \
 
 # 3. Sanity-check the wiring, then preview the cues
 jq -e '.hooks | keys' ~/.claude/settings.json
-~/.claude/tab-color.sh flash   # tab breathes pink
+~/.claude/tab-color.sh flash   # tab goes light pink
 ~/.claude/tab-color.sh done    # tab goes matcha green
 ~/.claude/tab-color.sh clear   # tab resets
 ```

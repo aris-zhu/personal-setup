@@ -106,7 +106,8 @@ Telescope needs these (all currently installed):
 - `ripgrep` 15.1.0 (`rg`, **required** for live_grep)
 - `fd` 10.4.2 (find_files)
 - `git` (used by lazy.nvim to clone plugins)
-- A **Nerd Font** in the terminal for nvim-web-devicons icons to render
+- A **Nerd Font** in the terminal for nvim-web-devicons icons to render — see
+  [Terminal font (iTerm2)](#terminal-font-iterm2--meslo-nerd-font)
 
 The language servers are plain binaries on `PATH` — Neovim spawns them, nothing auto-installs them:
 
@@ -202,9 +203,67 @@ conda config --set auto_activate false   # pre-25.x conda: auto_activate_base
 #    surfaces there as "Could not find a valid TypeScript installation").
 ```
 
-Install a Nerd Font for the file-tree icons. `mise`, `conda`, Docker, and `postgresql@16` are referenced in `.zshrc` but are optional unless you need those toolchains.
+Install a Nerd Font for the file-tree icons — see
+[Terminal font (iTerm2)](#terminal-font-iterm2--meslo-nerd-font). `mise`, `conda`, Docker, and
+`postgresql@16` are referenced in `.zshrc` but are optional unless you need those toolchains.
 
 The whole nvim setup is still just two files (`init.lua` + `lazy-lock.json`, ~9KB total) — copy them plus `ripgrep`/`fd` and the language-server binaries from step 1a, and you've reproduced the editor exactly.
+
+## Terminal font (iTerm2) — Meslo Nerd Font
+
+The "icons" in nvim (nvim-tree / nvim-web-devicons) aren't images — they're glyphs in a **Nerd
+Font**'s private-use area. With an unpatched font (the profile originally used Monaco) iTerm2 has no
+glyph to draw and falls back to the `?` box.
+
+Two pieces:
+
+- **Font:** the `font-meslo-lg-nerd-font` Homebrew cask, which installs the Meslo LG Nerd Font
+  family into `~/Library/Fonts`. The profile uses **MesloLGS Nerd Font Mono**
+  (PostScript name `MesloLGSNFM-Regular`, size 16). *Mono* = icons scaled to exactly one terminal
+  cell, so nothing overlaps or clips in nvim; the non-Mono variant draws larger icons that can bleed
+  into the next cell. *LGS* = small line gap, the variant closest to Monaco's feel (and the one
+  powerlevel10k standardised on).
+- **Profile:** a **dynamic profile** at
+  `~/Library/Application Support/iTerm2/DynamicProfiles/nerd-font.json`
+  (repo copy: `scripts/iterm2-nerd-font-profile.json`). Via `Dynamic Profile Parent Name` it
+  inherits everything from the `Default` profile and overrides only `Normal Font`.
+
+**Why a dynamic profile instead of editing the Default profile directly:** iTerm2 holds its settings
+in memory and rewrites `com.googlecode.iterm2.plist` from memory on quit, so a `defaults write` /
+PlistBuddy edit made while it's running is silently discarded. The `DynamicProfiles/` folder is the
+supported automation path — iTerm2 watches it and loads changes live, no restart needed.
+
+**Flipping already-open sessions:** an open tab stays on its old profile until told otherwise.
+iTerm2's proprietary `SetProfile` escape sequence switches a session live when written to that
+session's tty (hook stdout / a pipe won't do — it must reach the terminal device, same trick as
+`tab-color.sh`):
+
+```bash
+printf '\033]1337;SetProfile=Default (Nerd Font)\a' > /dev/ttysNNN
+```
+
+**One step stays manual:** a dynamic profile can't make itself the default, so *new* windows/tabs
+keep opening with `Default` (Monaco) until it's set in the GUI — *Settings → Profiles → select
+"Default (Nerd Font)" → Other Actions… → Set as Default*.
+
+### Replication (fresh macOS + iTerm2)
+
+```bash
+brew install --cask font-meslo-lg-nerd-font
+
+mkdir -p "$HOME/Library/Application Support/iTerm2/DynamicProfiles"
+cp scripts/iterm2-nerd-font-profile.json \
+   "$HOME/Library/Application Support/iTerm2/DynamicProfiles/nerd-font.json"
+
+# Flip every currently-open session to it (new ones need the Set as Default step above)
+for t in $(ps -A -o tty= | grep -E '^ttys' | sort -u); do
+  printf '\033]1337;SetProfile=Default (Nerd Font)\a' > /dev/$t 2>/dev/null
+done
+```
+
+The JSON assumes the parent profile is named `Default` — adjust `Dynamic Profile Parent Name` if
+yours differs. Font size lives in the same string (`"MesloLGSNFM-Regular 16"`). To try the larger
+non-Mono icons instead, swap in `MesloLGSNF-Regular`.
 
 ## Screenshots (macOS) — `fn+F4`
 

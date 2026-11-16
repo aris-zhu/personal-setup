@@ -1,0 +1,88 @@
+# ~/.zshrc — hand-maintained. oh-my-zsh is installed with --keep-zshrc so its
+# installer never overwrites this file.
+
+#-------------------------------------------------------------------------------
+# PATH / env
+#-------------------------------------------------------------------------------
+export PATH="$HOME/.local/bin:$PATH"
+[[ -d "$HOME/.cargo/bin" ]] && export PATH="$HOME/.cargo/bin:$PATH"
+
+export EDITOR=nvim
+
+#-------------------------------------------------------------------------------
+# oh-my-zsh
+#-------------------------------------------------------------------------------
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="gallifrey"
+# No plugins=(...) array on purpose — stock omz only.
+[[ -f "$ZSH/oh-my-zsh.sh" ]] && source "$ZSH/oh-my-zsh.sh"
+
+#-------------------------------------------------------------------------------
+# Git branch in the prompt.
+#
+# gallifrey draws the branch on the right-hand side asynchronously. The block
+# below is a self-contained vcs_info fallback that draws (branch) inline — it is
+# guarded so it ONLY activates when oh-my-zsh isn't loaded. Once omz/gallifrey is
+# present, the theme drives the branch and this disables itself.
+#-------------------------------------------------------------------------------
+if ! typeset -f git_prompt_info > /dev/null; then
+    autoload -Uz vcs_info
+    zstyle ':vcs_info:*' enable git
+    zstyle ':vcs_info:git:*' formats '(%b) '
+    zstyle ':vcs_info:git:*' actionformats '(%b|%a) '
+    precmd_vcs_info() { vcs_info }
+    precmd_functions+=( precmd_vcs_info )
+    setopt prompt_subst
+    PROMPT='%n@%m %2~ ${vcs_info_msg_0_}%B»%b '
+fi
+
+#-------------------------------------------------------------------------------
+# Prompt label is `%n@%m` (user@host) — reads `aris@opti-prod ~ »` — so a remote shell
+# always says which box it is on (the Mac's .zshrc uses the fixed label `AZ`).
+#
+# Re-defines PROMPT *after* sourcing omz, substituting a user@host label for
+# the one gallifrey opens with and keeping the rest of the theme's prompt
+# verbatim (%2~ dir, git slot, bold », red-when-root). The typeset -f guard means
+# it only applies when omz actually loaded. Prompt-only — no system settings.
+#-------------------------------------------------------------------------------
+if typeset -f git_prompt_info > /dev/null; then
+    PROMPT="%(!.%{$fg[red]%}.%{$fg[green]%})%n@%m%{$reset_color%} %2~ \$(git_prompt_info)%{$reset_color%}%B»%b "
+fi
+
+#-------------------------------------------------------------------------------
+# Aliases
+#-------------------------------------------------------------------------------
+alias vim='nvim'
+alias vimrc='nvim ~/.config/nvim/init.lua'
+# Edit ~/.zshrc, then reload it into the current shell on quit. A shell can't
+# reload its own parent, so the source runs after nvim exits.
+alias zshrc='nvim ~/.zshrc && source ~/.zshrc'
+alias szsh='source ~/.zshrc'
+alias nb='jupyter notebook'
+alias cab='conda activate base'
+alias keepawake='~/.local/bin/keepawake'
+
+#-------------------------------------------------------------------------------
+# Version managers — both optional; guarded so a machine without them still works.
+#-------------------------------------------------------------------------------
+[[ -x "$HOME/.local/bin/mise" ]] && eval "$($HOME/.local/bin/mise activate zsh)"
+
+# >>> conda initialize >>>
+if [[ -x "$HOME/anaconda3/bin/conda" ]]; then
+    __conda_setup="$("$HOME/anaconda3/bin/conda" 'shell.zsh' 'hook' 2> /dev/null)"
+    if [ $? -eq 0 ]; then
+        eval "$__conda_setup"
+    elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+        . "$HOME/anaconda3/etc/profile.d/conda.sh"
+    else
+        export PATH="$HOME/anaconda3/bin:$PATH"
+    fi
+    unset __conda_setup
+fi
+# <<< conda initialize <<<
+
+# uv's installer drops this env file; the tarball install used by personal-setup does not need it
+[[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
+
+# Claude Code account router (~/personal-ws/claude-router): `claude` picks the account by usage limits
+command -v claude-router >/dev/null && eval "$(claude-router shell-init)"

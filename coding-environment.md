@@ -209,6 +209,88 @@ Install a Nerd Font for the file-tree icons — see
 
 The whole nvim setup is still just two files (`init.lua` + `lazy-lock.json`, ~9KB total) — copy them plus `ripgrep`/`fd` and the language-server binaries from step 1a, and you've reproduced the editor exactly.
 
+## Linux hosts — `opti-dev` / `opti-prod` (Ubuntu desktop, over Tailscale)
+
+Two Dell OptiPlex boxes run the SO-101 rigs. **`opti-dev`** (the original "optiplex") is the
+development rig host; **`opti-prod`** (reached through Tailscale SSH — no keys to copy) is the host that livestreams every
+live rig to the arena. Both are Ubuntu 26.04 desktop installs: 16 cores, 14 GB, no GPU, the
+system python is 3.14, and `eno1` stays DOWN until a cable is in (they boot onto a Wi-Fi dongle).
+
+On the Mac, `~/.ssh/config` names them (`Host opti opti-dev` and `Host opti-prod opti2`, by
+Tailscale IP so a hostname change never breaks them; the IPs and login users live only there, not in
+this public repo) and `.zshrc` has `sshopti` / `sshoptidev` and `sshopti2` /
+`sshoptiprod`.
+
+### Bootstrap — two halves
+
+```bash
+# 1. USER half, run from the Mac: pushes scripts/linux + ~/.claude/{CLAUDE.md,agents/codex-implementer.md}
+#    to <host>:~/setup and runs user-tools.sh there. No sudo. Idempotent — re-run any time.
+scripts/bootstrap-linux-host.sh opti-prod
+
+# 2. ROOT half, once, on the host (the only step that needs the sudo password):
+ssh opti-prod
+sudo bash ~/setup/root-steps.sh opti-prod     # apt: git zsh neovim ripgrep fd-find curl wget rsync build-essential v4l-utils
+                                              # chsh → zsh; groups dialout (arms) + video (cameras); hostname (+ tailnet name);
+                                              # ethernet ahead of Wi-Fi (the nmcli metric fix opti-dev needed on 2026-09-15)
+bash ~/setup/user-tools.sh                    # re-run: oh-my-zsh (--keep-zshrc) + `Lazy! restore` now that git/zsh exist
+claude            # sign in (device/browser login)
+codex login       # ChatGPT account
+```
+
+`user-tools.sh` installs, in order: a **static curl** into `~/.local/bin`, **uv** + CPython 3.12,
+**mise** + node LTS, **Claude Code** (native installer) and the **Codex CLI** (`npm -g`), registers
+Codex as Claude's user-scoped MCP server exactly as `~/personal-ws/codex-setup` describes, and
+drops the dotfiles. Versions are pinned at the top of the script (`CURL_VER`, `UV_VER`, `MISE_VER`).
+
+**Why the static curl comes first.** Ubuntu desktop ships *only* the snap build of curl, and a
+snap cannot write into dot-directories (`~/.local`, `~/.cache`, `~/.claude`), so every
+`curl … | sh` installer — Claude Code's, uv's, mise's — fails in odd ways. `user-tools.sh` fetches
+the first binaries with `wget`/`python3` instead and puts a real curl ahead of `/snap/bin` on
+`PATH`; `root-steps.sh` later swaps the snap for apt's curl. Use the **musl** build of
+[stunnel/static-curl](https://github.com/stunnel/static-curl): the glibc build dies with a
+floating-point exception on its first TLS request on these boxes (seen 2026-09-21 on opti-prod).
+The snap curl has one more side effect: it prints a multi-line "Caution" banner on **stderr** for
+every call, which breaks any remote command that merges stderr (the robot orchestrator's rig health
+check over ssh read an empty line and marked every rig offline). `curl.snap-acked` silences the
+banner; removing the snap (`root-steps.sh` does) removes the problem. The same snap confinement is why uv is
+installed from its release tarball rather than `astral.sh/uv/install.sh`.
+
+**Dotfiles differ from the Mac's on purpose.** `scripts/linux/zshrc` is the Linux `.zshrc` (same
+structure as the Mac's: omz `gallifrey`, the `vcs_info` fallback, the prompt override — but the
+label is `%n@%m`, so a remote shell reads `aris@opti-prod ~ »` and always says which box it is).
+`scripts/linux/init.lua` + `lazy-lock.json` are the Linux copies of the Neovim config (the same
+setup described above, with the plugin commits the Linux boxes were restored from). `user-tools.sh`
+never overwrites a dotfile that already differs on the host — they are hand-maintained there too.
+
+**claude-router comes along.** The bootstrap stages `~/personal-ws/claude-router` (a private repo,
+so the host cannot clone it) and `user-tools.sh` installs it the way its README says: symlinks
+`claude-router` and `claude-routed` into `~/.local/bin`, merges the `statusLine` and the three hook
+events into `~/.claude/settings.json`, and adds the `shell-init` line to `.zshrc`. On Linux the
+router keeps each slot's credentials in `<slot>/.credentials.json` instead of the Keychain (see the
+router README's Linux paragraph). Enrolling is per machine: run `claude-router add <email>` for each
+account on the host itself; refresh tokens rotate, so never copy a credentials file between
+machines. To push a checkout other than the main one, set `CLAUDE_ROUTER_SRC=<dir>`.
+
+**Sign-ins stay manual** (`claude-router add <email>` per account, `codex login`): both are
+browser/device logins tied to the user's accounts. Everything else is unattended.
+
+**GitHub access is one fine-grained token per machine**, kept only on that machine at
+`~/.config/github/token` (0600) and placed by hand. `user-tools.sh` installs `gh` via mise and sets a
+git credential helper that reads that file, so private clones and pushes work without copying the
+secret anywhere else. When creating the token on github.com, set *Repository access → Only select
+repositories* to the private repos the box needs and *Contents: Read* (Read and write for pushes);
+a token left on "Public repositories" authenticates fine but every private repo answers 404, which
+looks like a wrong token.
+
+### Rig software (not part of this repo)
+
+The rig daemon and its host scripts are deployed from the `so101-mujoco` repo, branch
+`live-rigs/rigd-deploy`: `rigd/deploy/deploy-host.sh <host> --ffmpeg <dir>` rsyncs `rigd/` to
+`~/robot-run`, builds the venv at `~/so101/venv` (Python 3.12: numpy, OpenCV, Pillow, pyserial;
+`--arms` adds LeRobot 0.6.2 on a CPU torch) and seeds a fake `rigs.json`. The Mac-side stack that
+points the arena at `opti-prod` lives in `~/my-ws/serve2/opti-prod-stack/` (`stack.sh start|stop|status`).
+
 ## Terminal font (iTerm2) — Meslo Nerd Font
 
 The "icons" in nvim (nvim-tree / nvim-web-devicons) aren't images — they're glyphs in a **Nerd
@@ -352,6 +434,41 @@ echo "alias keepawake='~/.local/bin/keepawake'" >> ~/.zshrc && source ~/.zshrc
 ```
 
 `keepawake lid` prompts for `sudo` (it's the only subcommand that needs it).
+
+## External-monitor brightness (macOS) — MonitorControl
+
+The brightness keys on the top row (`F1`/`F2` — media keys on a bare press, since `fnState = false`, see the Screenshots section) only ever reach the **built-in** display. External monitors take brightness/contrast/volume over **DDC/CI** (the VESA control channel that rides on the display cable's I2C lines), and macOS has no UI or API for it. [**MonitorControl**](https://github.com/MonitorControl/MonitorControl) (open source, menu-bar app) speaks DDC/CI, so the same brightness keys — and the volume keys, for monitors with speakers — drive whichever display the cursor is on, plus per-display sliders under the menu-bar icon. This laptop runs two external 1080p displays, so without it every brightness change on them was a trip through the monitor's own OSD buttons. Displays that don't answer DDC/CI get a **software** fallback: a gamma-table overlay that darkens the image without touching the backlight.
+
+**Current setup on this machine.** `/Applications/MonitorControl.app` 4.4.0, bundle id **`app.monitorcontrol.MonitorControl`** (not the older `me.guillaumeb.MonitorControl` most web guides quote; `defaults read` on that domain reports "does not exist" here). It was installed by hand from the `.dmg`, **not** via Homebrew, and every app-level setting is at its default: menu-bar icon shown, brightness and volume keys intercepted. The plist only holds per-display state; `isTouched16(<display>@<n>) = 1` for a display means brightness has actually been written to it over DDC, which is the useful thing to check.
+
+**Accessibility permission is the silent one.** Intercepting the brightness/volume keys needs *System Settings → Privacy & Security → Accessibility*. Without it the app runs, the menu-bar sliders work, and the keys keep changing only the built-in display — nothing looks broken. It's a TCC grant, so it can't be scripted; one click, once per machine.
+
+**DDC/CI has to survive the cable path.** Some monitors ship with DDC/CI off in their own OSD menu, and some paths never carry it: USB-C/Thunderbolt hubs and especially **DisplayLink** docks are the usual culprit (the DisplayLink driver doesn't expose DDC). Symptom: the display appears in MonitorControl but only the software-dim slider moves — the image darkens, the backlight doesn't. Try a direct HDMI/DisplayPort cable before blaming the monitor.
+
+**The DDC knobs are hidden.** Per-display DDC on/off, the software-dimming fallback, VCP ranges and polling live behind *Settings → Advanced → Show advanced settings*; the default view shows none of them.
+
+**Bringing it under Homebrew.** The cask is `monitorcontrol` (4.4.0, `auto_updates`). Because the copy here was installed by hand, `brew install --cask monitorcontrol --adopt` takes over the existing `/Applications/MonitorControl.app` without reinstalling; a fresh machine just uses the plain install. `auto_updates` means `brew upgrade` leaves it alone and the in-app Sparkle updater (on by default, as above) does the updating.
+
+### Replication (fresh macOS)
+
+```bash
+brew install --cask monitorcontrol   # machine with a hand-installed copy: add --adopt
+
+# First launch puts the icon in the menu bar and asks for Accessibility
+open -a MonitorControl
+
+# Grant it (can't be scripted): Privacy & Security -> Accessibility -> enable MonitorControl
+open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+
+# Start at login: menu-bar icon -> Settings -> General -> "Start at login"
+# (or System Settings -> General -> Login Items & Extensions)
+
+# Sanity check: cursor on an external display, press the brightness key, watch that
+# monitor's own OSD move. Then confirm DDC writes landed:
+pgrep -x MonitorControl && defaults read app.monitorcontrol.MonitorControl | grep -E 'isTouched16|SwBrightness'
+```
+
+`isTouched16(<display>@<n>) = 1` for a display is the proof DDC is actually reaching it. If only its `SwBrightness(...)` value moves when you press the keys, DDC isn't getting through — see the dock trap above.
 
 ## Window tiling (Linux / GNOME) — Rectangle-style shortcuts
 

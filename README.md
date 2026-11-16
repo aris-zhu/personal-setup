@@ -16,6 +16,10 @@ state by reading one file and running the commands in it.
 | `scripts/keepawake` | Toggles display-sleep prevention (wraps `caffeinate`) |
 | `scripts/claude-tab-color.sh` | Colours the iTerm2 tab on Claude Code events |
 | `scripts/claude-settings-hooks.json` | The Claude Code hook config that drives the script above |
+| `scripts/bootstrap-linux-host.sh` | From the Mac: pushes `scripts/linux/` to a Linux host and runs its user-level setup |
+| `scripts/linux/user-tools.sh` | On the host, no sudo: static curl, uv + Python 3.12, mise + node, Claude Code, Codex (+ MCP), dotfiles |
+| `scripts/linux/root-steps.sh` | On the host, once with sudo: apt tools, zsh login shell, rig groups, hostname, ethernet |
+| `scripts/linux/{zshrc,zshenv,init.lua,lazy-lock.json}` | The Linux copies of the dotfiles (`user@host` prompt) |
 
 ## Start here
 
@@ -30,8 +34,12 @@ Otherwise `coding-environment.md` is organised as:
 - **[Neovim](coding-environment.md#neovim--confignviminitlua)** — options, keymaps, LSP, plugins,
   external dependencies
 - **[Shell](coding-environment.md#shell--zshrc)** — oh-my-zsh, prompt, aliases, PATH
+- **[Linux hosts](coding-environment.md#linux-hosts--opti-dev--opti-prod-ubuntu-desktop-over-tailscale)** — `opti-dev` / `opti-prod`:
+  the two-half bootstrap (user-level script from the Mac, one sudo script on the host), why a
+  static curl comes first, where the rig software comes from
 - **Extras** — [screenshots on `fn+F4`](coding-environment.md#screenshots-macos--fnf4),
   [`keepawake`](coding-environment.md#keeping-the-mac-awake--keepawake),
+  [MonitorControl (external-monitor brightness)](coding-environment.md#external-monitor-brightness-macos--monitorcontrol),
   [GNOME window tiling](coding-environment.md#window-tiling-linux--gnome--rectangle-style-shortcuts),
   [Claude Code notification cues](coding-environment.md#claude-code-notifications--sound--tab-colour)
 

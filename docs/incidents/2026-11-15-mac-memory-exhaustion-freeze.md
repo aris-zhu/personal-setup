@@ -97,5 +97,5 @@ Important ones. All were fixed, with a regression test each (146 tests in the to
 1. Check `/Library/Logs/DiagnosticReports` for `.panic` or `JetsamEvent-*.ips`. With neither, it
    was a hang.
 2. Run `tail ~/Library/Logs/heat-guard.log` and look for `memory-thrash` or `pressure` events.
-3. Search `/usr/bin/log show --start <last 20 min> --style compact` for `JETSAM_REASON` and
+3. Search `/usr/bin/log show --start "YYYY-MM-DD HH:MM:SS" --end "<last log line>" --style compact` (or `--last 20m` while it is still happening) for `JETSAM_REASON` and
    `memory pressure`, and count WindowServer lines per minute to find when the UI stalled.

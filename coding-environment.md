@@ -217,7 +217,7 @@ live rig to the arena. Both are Ubuntu 26.04 desktop installs: 16 cores, 14 GB, 
 system python is 3.14, and `eno1` stays DOWN until a cable is in (they boot onto a Wi-Fi dongle).
 
 On the Mac, `~/.ssh/config` names them (`Host opti opti-dev` and `Host opti-prod opti2`, by
-Tailscale IP so a hostname change never breaks them; the IPs and login users live only there, not in
+Tailscale IP so a hostname change never breaks them; the IPs live only there, not in
 this public repo) and `.zshrc` has `sshopti` / `sshoptidev` and `sshopti2` /
 `sshoptiprod`.
 
@@ -241,7 +241,7 @@ codex login       # ChatGPT account
 `user-tools.sh` installs, in order: a **static curl** into `~/.local/bin`, **uv** + CPython 3.12,
 **mise** + node LTS, **Claude Code** (native installer) and the **Codex CLI** (`npm -g`), registers
 Codex as Claude's user-scoped MCP server exactly as `~/personal-ws/codex-setup` describes, and
-drops the dotfiles. Versions are pinned at the top of the script (`CURL_VER`, `UV_VER`, `MISE_VER`).
+drops the dotfiles. The first-install versions of curl, uv and mise are pinned at the top of the script (`CURL_VER`, `UV_VER`, `MISE_VER`); an existing install is kept as is, and node, gh and Codex track their latest releases.
 
 **Why the static curl comes first.** Ubuntu desktop ships *only* the snap build of curl, and a
 snap cannot write into dot-directories (`~/.local`, `~/.cache`, `~/.claude`), so every

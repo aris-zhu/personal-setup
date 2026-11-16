@@ -29,6 +29,8 @@ fi
 # Ethernet ahead of the Wi-Fi dongle once a cable is in (the fix opti-dev needed on 2026-09-15;
 # netplan may revert it after a reboot — re-run this script if the default route is Wi-Fi again)
 if nmcli -t -f NAME con show 2>/dev/null | grep -qx netplan-eno1; then
+  # On these hosts netplan-eno1 came up without a usable method; setting ipv4.method auto
+  # was part of the 2026-09-15 fix. A host with a static eno1 address should drop that setting.
   nmcli con mod netplan-eno1 ipv4.method auto ipv4.route-metric 100 ipv6.route-metric 100 connection.autoconnect yes
   nmcli con up netplan-eno1 2>/dev/null || echo "eno1 not up (no cable?) — it will come up when one is plugged in"
 fi

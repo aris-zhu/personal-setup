@@ -16,7 +16,8 @@ cp "$HOME/.claude/CLAUDE.md" "$HOME/.claude/agents/codex-implementer.md" "$STAGE
 ROUTER_SRC=${CLAUDE_ROUTER_SRC:-$HOME/personal-ws/claude-router}
 if [ -d "$ROUTER_SRC" ]; then rsync -a --exclude .git --exclude node_modules "$ROUTER_SRC/" "$STAGE/claude-router/"; fi
 ssh "$HOST" 'mkdir -p ~/setup'
-rsync -az "$STAGE/" "$HOST:setup/"
+# ~/setup is a dedicated staging directory; delete stale files from previous runs.
+rsync -az --delete "$STAGE/" "$HOST:setup/"
 rm -rf "$STAGE"
 ssh "$HOST" 'bash ~/setup/user-tools.sh'
 cat <<MSG

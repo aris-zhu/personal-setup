@@ -435,6 +435,36 @@ echo "alias keepawake='~/.local/bin/keepawake'" >> ~/.zshrc && source ~/.zshrc
 
 `keepawake lid` prompts for `sudo` (it's the only subcommand that needs it).
 
+## Keeping the Mac responsive — `heat-guard`
+
+This Mac (M5 Pro, 24 GB) runs about 25 coding-agent sessions at once. **heat-guard**
+(`~/personal-ws/heat-guard`, a local git repo with no dependencies, Node 20+) is a LaunchAgent that
+runs once a minute and sheds runaway *development* load. That means tests, dev servers and
+Playwright browsers. It never touches agents (`claude` / `codex`), anything above them, or ordinary
+apps.
+
+| Rule | What it does |
+|---|---|
+| K-mem | Kill a test/dev process tree whose footprint reaches all of RAM (re-checked every 10 s) |
+| K-pressure | **high** (swap ≥ 0.6 × RAM): kill orphaned Playwright/Puppeteer browsers ≥ 10 min old. **critical** (kernel pressure ≥ warn, or ≤ 12% free): also kill the largest test/dev tree every 10 s until it clears, and notify |
+| K-orphan / K-shell | Kill orphaned tests burning a core for an hour; kill ownerless agent shells after 6 h |
+| Throttle / N-hot | Background-priority hot jobs over an 8-core budget; notify on long-hot jobs |
+| Gate | Claude Code `PreToolUse` hook: block whole-suite test runs above 10 hot cores, or while memory is high/critical |
+
+```bash
+cd ~/personal-ws/heat-guard
+node bin/heat-guard status          # memory stage, hot cores, what it would act on
+node bin/heat-guard run --dry-run   # read-only full pass
+node bin/heat-guard install         # write + load ~/Library/LaunchAgents/com.aris.heat-guard.plist
+tail ~/Library/Logs/heat-guard.log  # kills, notifications, memory-thrash/pressure events
+```
+
+Turn killing off with `{"kill": false}` in `~/.config/heat-guard/config.json`. Kills then become
+"would kill" notifications. The memory rules exist because of the
+[2026-11-15 freeze](docs/incidents/2026-11-15-mac-memory-exhaustion-freeze.md). heat-guard can
+only shed about 5 GB of dev load, though. The structural load is open sessions (about 0.7 GB each
+with their MCP servers) plus iTerm, so a Mac with high swap means closing idle sessions.
+
 ## External-monitor brightness (macOS) — MonitorControl
 
 The brightness keys on the top row (`F1`/`F2` — media keys on a bare press, since `fnState = false`, see the Screenshots section) only ever reach the **built-in** display. External monitors take brightness/contrast/volume over **DDC/CI** (the VESA control channel that rides on the display cable's I2C lines), and macOS has no UI or API for it. [**MonitorControl**](https://github.com/MonitorControl/MonitorControl) (open source, menu-bar app) speaks DDC/CI, so the same brightness keys — and the volume keys, for monitors with speakers — drive whichever display the cursor is on, plus per-display sliders under the menu-bar icon. This laptop runs two external 1080p displays, so without it every brightness change on them was a trip through the monitor's own OSD buttons. Displays that don't answer DDC/CI get a **software** fallback: a gamma-table overlay that darkens the image without touching the backlight.

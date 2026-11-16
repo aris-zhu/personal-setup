@@ -14,6 +14,7 @@ state by reading one file and running the commands in it.
 |---|---|
 | [`coding-environment.md`](coding-environment.md) | The main document — editor, shell, keybindings, dependencies, and step-by-step replication |
 | `scripts/keepawake` | Toggles display-sleep prevention (wraps `caffeinate`) |
+| `docs/incidents/` | Write-ups of machine incidents and what changed because of them |
 | `scripts/claude-tab-color.sh` | Colours the iTerm2 tab on Claude Code events |
 | `scripts/claude-settings-hooks.json` | The Claude Code hook config that drives the script above |
 | `scripts/bootstrap-linux-host.sh` | From the Mac: pushes `scripts/linux/` to a Linux host and runs its user-level setup |
@@ -39,6 +40,7 @@ Otherwise `coding-environment.md` is organised as:
   static curl comes first, where the rig software comes from
 - **Extras** — [screenshots on `fn+F4`](coding-environment.md#screenshots-macos--fnf4),
   [`keepawake`](coding-environment.md#keeping-the-mac-awake--keepawake),
+  [`heat-guard` (keeps the Mac from freezing)](coding-environment.md#keeping-the-mac-responsive--heat-guard),
   [MonitorControl (external-monitor brightness)](coding-environment.md#external-monitor-brightness-macos--monitorcontrol),
   [GNOME window tiling](coding-environment.md#window-tiling-linux--gnome--rectangle-style-shortcuts),
   [Claude Code notification cues](coding-environment.md#claude-code-notifications--sound--tab-colour)
